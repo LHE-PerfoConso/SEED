@@ -1341,7 +1341,7 @@ function famillesPinces(){
     if(!familles.has(correspondance[1])) familles.set(correspondance[1], []);
     familles.get(correspondance[1]).push(colonne);
   }
-  return familles;
+  return new Map([...familles].filter(([, colonnes]) => colonnes.length >= 2));
 }
 
 function remplirFamillesPinces(){
@@ -1357,7 +1357,7 @@ function remplirFamillesPinces(){
   $("fusionnerPinces").disabled = !correctionAppliquee || !choix.value;
   $("etatPinces").textContent = familles.size
     ? `${familles.size} famille(s) détectée(s). Appliquer l'échelle avant de fusionner.`
-    : "Aucune voie de pince avec une gamme numérique détectée.";
+    : "Aucune famille de pinces avec au moins deux voies de calibre détectée.";
 }
 
 function fusionnerFamillePinces(){
