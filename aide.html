@@ -104,6 +104,7 @@ blockquote{ margin:14px 0; padding:8px 14px; border-left:4px solid var(--yellow)
           <tr><td><code>.M00x</code></td><td>Morphée, tabulation, 4 lignes d'entête</td><td>Sélectionnable</td><td>Timer de l'enregistrement libre et horodatage reconstruit depuis Date/Heure</td></tr>
           <tr><td>BRBC3</td><td>CSV virgule</td><td>UTF-8</td><td>Colonne <code>TEMPS</code> (s), instant initial lu dans <code>Time</code></td></tr>
           <tr><td>Soufflerie</td><td>CSV point-virgule, 1 ligne d'entête, décimales avec virgule</td><td>Windows-1252</td><td>Colonne 1 (s), date/heure dans les colonnes 3 et 2 de la première ligne de données</td></tr>
+          <tr><td>CAN_only</td><td>CSV virgule ou point-virgule, 1 ligne de noms, valeurs des voies avec un point décimal</td><td>UTF-8</td><td>Colonne 1 : secondes ou horodatage valide et strictement croissant ; au moins deux mesures</td></tr>
           <tr><td><code>.seed</code></td><td>TSV, 1 ligne d'entête</td><td>Windows-1252</td><td>Colonne <code>TEMPS</code> (s)</td></tr>
         </tbody>
       </table></div>
@@ -113,6 +114,16 @@ blockquote{ margin:14px 0; padding:8px 14px; border-left:4px solid var(--yellow)
       <p>Les noms de voies connus sont normalisés selon la table de correspondances commune. La correspondance accepte les espaces ou les soulignés ; les voies non référencées gardent leur nom. Pour BRBC3, espaces et <code>~</code> deviennent des soulignés, et les constantes d'entête (inertie et coefficients F0/F1/F2) sont ajoutées comme voies constantes.</p>
       <h3>Base de temps et encodage</h3>
       <p>BRBC3, Soufflerie et SEED utilisent un pas estimé depuis les premières mesures, puis reconstruisent une base de temps uniforme. Cela supprime la gigue d'acquisition et fournit un pas constant. Pour <code>.M00x</code>, l'horodatage est reconstruit depuis le timer, ce qui préserve les ruptures éventuelles de cadence. Le sélecteur d'encodage ne concerne que les fichiers <code>.M00x</code>.</p>
+      <h3>Traiter un CAN seul avec CAN_only</h3>
+      <p><strong>CAN_only</strong> charge un journal CAN comme fichier principal, sans fichier banc ni synchronisation obligatoire. Le format est exactement celui de <strong>CSV CAN</strong> dans la zone de synchronisation ; les réglages d'export ASAM MDF décrits plus bas s'appliquent aussi. Les noms de voies d'origine sont conservés.</p>
+      <p>Les écarts de temps du CSV sont conservés, sans rééchantillonnage. L'origine affichée sur le graphique est la date de modification du fichier, et non l'horodatage absolu du CSV. Pour un export <code>.seed</code>, fournir une cadence régulière : l'export utilise un pas unique et un temps relatif démarrant à zéro.</p>
+      <ol>
+        <li>Charger le CSV avec <strong>CAN_only</strong> dans la ligne de chargement principale.</li>
+        <li>Charger le CSV d'offset de même format avec <strong>Offset CAN_only</strong>, puis cliquer sur <strong>Appliquer offset et échelle</strong>. Conserver exactement les mêmes noms de voies dans les deux fichiers.</li>
+        <li>Si plusieurs calibres de courant sont détectés, choisir la famille puis cliquer sur <strong>Fusionner les calibres</strong>.</li>
+        <li>Contrôler les courbes, puis utiliser <strong>Exporter SEED</strong> ou <strong>Exporter la plage affichée</strong>.</li>
+      </ol>
+      <p>La détection des instruments <code>I</code>, <code>U</code>, <code>T</code>, <code>P</code> et <code>D</code>, les offsets et la fusion suivent les règles des sections suivantes. Le bouton <strong>CSV CAN</strong> reste réservé au chargement d'une source externe à synchroniser avec le fichier principal.</p>
     </section>
 
     <section id="correction">
@@ -122,7 +133,7 @@ blockquote{ margin:14px 0; padding:8px 14px; border-left:4px solid var(--yellow)
         <thead><tr><th>Préfixe</th><th>Grandeur</th><th>Unité</th></tr></thead>
         <tbody><tr><td>I</td><td>Courant</td><td>A</td></tr><tr><td>U</td><td>Tension</td><td>V</td></tr><tr><td>T</td><td>Température</td><td>°C</td></tr><tr><td>P</td><td>Pression</td><td>bar</td></tr><tr><td>D</td><td>Déplacement</td><td>mm</td></tr></tbody>
       </table></div>
-      <p>Le fichier d'offset doit provenir du même banc. Pour chaque voie éligible, l'offset est la moyenne des 60 dernières secondes du fichier, supposées correspondre à un palier stabilisé au repos.</p>
+      <p>Le fichier d'offset doit provenir du même banc ou, pour <strong>CAN_only</strong>, être un CSV CAN de même format avec les mêmes noms de voies. Pour chaque voie éligible, l'offset est la moyenne des 60 dernières secondes du fichier, supposées correspondre à un palier stabilisé au repos. Une voie sans correspondance utilise un offset nul et est signalée dans le compte rendu.</p>
       <pre>valeur_corrigée = (valeur_brute - offset) × coefficient / 10 × signe</pre>
       <p>L'offset n'est pas soustrait aux voies de type <code>T</code>, car une température absolue n'a pas de zéro instrumental à compenser. La correction repart toujours des valeurs brutes et n'est jamais cumulative. <strong>Réinitialiser</strong> restaure les valeurs d'origine.</p>
     </section>
@@ -137,6 +148,7 @@ blockquote{ margin:14px 0; padding:8px 14px; border-left:4px solid var(--yellow)
     <section id="synchronisation">
       <h2>4. Sources externes et synchronisation</h2>
       <p>La section de synchronisation apparaît lorsqu'un fichier de mesure est chargé.</p>
+      <p><a href="aide_synchronisation.html">Ouvrir le guide détaillé de synchronisation : procédure, choix du seuil et dépannage.</a></p>
       <div class="tableViewport"><table>
         <thead><tr><th>Bouton</th><th>Extension / séparateur</th><th>Entête</th><th>Temps</th></tr></thead>
         <tbody>

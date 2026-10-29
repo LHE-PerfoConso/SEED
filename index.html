@@ -289,6 +289,8 @@ select.compact{ width:auto; min-width:140px; padding:6px 10px; font-size:12px; }
         <input type="file" id="fichierBrbc3" accept=".csv,.txt">
         <label class="filebtn compact" for="fichierSf" title="Fichier de mesure Soufflerie froide (.csv)">Soufflerie</label>
         <input type="file" id="fichierSf" accept=".csv,.txt">
+        <label class="filebtn compact" for="fichierCanOnly" title="Fichier de mesure CAN seul (.csv)">CAN_only</label>
+        <input type="file" id="fichierCanOnly" accept=".csv,text/csv">
         <label class="filebtn compact" for="fichierSeed" title="Relire un export .seed">.seed</label>
         <input type="file" id="fichierSeed" accept=".seed">
         <label for="encodage" class="titreLigne">Encodage</label>
@@ -342,6 +344,7 @@ select.compact{ width:auto; min-width:140px; padding:6px 10px; font-size:12px; }
           <input type="file" id="fichierDiagra" accept=".csv,.txt">
           <button type="button" id="ouvrirSync" class="compact" disabled>Synchroniser</button>
           <button type="button" id="appliquerEchelleSource" class="compact" disabled>Appliquer offset et échelle CAN</button>
+          <a class="btn2 compact aideLien" href="aide_synchronisation.html" target="_blank" rel="noopener">Aide synchronisation</a>
           <input type="file" id="fichierOffsetSource" accept=".csv,text/csv" hidden>
         </div>
         <p id="etatSync" class="hint" role="status" aria-live="polite"></p>
@@ -441,6 +444,7 @@ const BANCS = {
   bperf: { libelle: "BPERF", accept: ".M001,.M002,.M003,.M004,.M005,.M006,.M007,.M008,.M009,.m001,.m002,.m003,.m004,.m005,.m006,.m007,.m008,.m009", correction: true },
   brbc3: { libelle: "BRBC3", accept: ".csv,.txt", correction: true },
   soufflerie: { libelle: "Soufflerie", accept: ".csv,.txt", correction: true },
+  can_only: { libelle: "CAN_only", accept: ".csv,text/csv", correction: true },
   seed: { libelle: "SEED", accept: ".seed", correction: false }
 };
 
@@ -799,14 +803,14 @@ function champsCsv(ligne, separateur){
   return champs;
 }
 
-async function analyserCsv(fichier){
+async function analyserCsv(fichier, progression = () => {}){
   if(!/\.csv$/i.test(fichier.name)) throw new Error("Choisir un fichier CSV.");
   let entetes = null;
   let separateur = ",";
   let mesuresCsv = [];
   let nombreLignes = 0;
   const temps = [];
-  await lireFichier(fichier, "utf-8", () => {}, ligne => {
+  await lireFichier(fichier, "utf-8", progression, ligne => {
     if(!ligne.trim()) return;
     if(!entetes){
       separateur = (ligne.match(/;/g) || []).length > (ligne.match(/,/g) || []).length ? ";" : ",";
@@ -835,6 +839,24 @@ async function analyserCsv(fichier){
   });
   if(!nombreLignes) throw new Error("Le CSV ne contient aucune mesure.");
   return { nom: fichier.name, libelle: "CAN", temps, mesures: mesuresCsv.filter(colonne => colonne.valides), longueur: nombreLignes };
+}
+
+async function analyserFichierCanOnly(fichier, progression = () => {}){
+  const donnees = await analyserCsv(fichier, progression);
+  if(donnees.temps.length < 2) throw new Error("Le CSV CAN_only doit contenir au moins deux mesures.");
+  if(donnees.temps.some((instant, index) => !Number.isFinite(instant) || (index > 0 && instant <= donnees.temps[index - 1]))){
+    throw new Error("Le CSV CAN_only doit contenir un temps valide et strictement croissant dans sa premi\u00e8re colonne.");
+  }
+  const origine = donnees.temps[0];
+  const horodatages = donnees.temps.map(instant => dateDepuisInstant(fichier.lastModified + (instant - origine) * 1000));
+  const colonnes = donnees.mesures.map((colonne, index) => ({
+    ...colonne,
+    index,
+    nomAffiche: colonne.nom,
+    label: `${colonne.nom} (${index + 1})`,
+    unite: ""
+  }));
+  return { ...donnees, dates: horodatages, mesures: colonnes, pas: pasTemps(horodatages) };
 }
 
 // Formats issus des outils SEED : CarScanner, OBD Facile et Diagra.
@@ -1030,6 +1052,7 @@ const LECTEURS_BANCS = {
   bperf: analyserFichier,
   brbc3: analyserFichierBrbc3,
   soufflerie: analyserFichierSoufflerie,
+  can_only: analyserFichierCanOnly,
   seed: analyserFichierSeed
 };
 
@@ -1802,6 +1825,7 @@ const ENTREES_MESURES = [
   ["fichier", "bperf"],
   ["fichierBrbc3", "brbc3"],
   ["fichierSf", "soufflerie"],
+  ["fichierCanOnly", "can_only"],
   ["fichierSeed", "seed"]
 ];
 
